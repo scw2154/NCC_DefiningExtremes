@@ -47,8 +47,8 @@ def load_model(out_df: pd.DataFrame, df: pd.DataFrame, x_label: str, count_label
     y_ewe = df.loc[bvalid,count_label].astype(np.float64)
     p_max = np.max(y_ewe) / N
 
-    pad_rat = 0.3
-    psz = 10000
+    pad_rat = 20.0
+    psz = 1000000
     val_range = np.abs(np.max(x.values) - np.min(x.values))
     pad = pad_rat*val_range
     x_vals = np.linspace(np.min(x.values)-pad, np.max(x.values)+pad, psz)
@@ -62,12 +62,18 @@ def load_model(out_df: pd.DataFrame, df: pd.DataFrame, x_label: str, count_label
 
     fig = plt.figure()
     ax = sns.scatterplot(x=x, y=y_ewe)
+    # ax = sns.regplot(x=x,y=y_ewe/N, logistic=True)
     ax.set(xlabel=x_ax, ylabel=y_ax)
-    # sns.regplot(x=x, y=p_ewe, logistic=True)
     pad_mult = pad_rat / (1+2*pad_rat)
     idx_range = range(int(pad_mult*psz),int((1-pad_mult)*psz+1))
     plt.plot(x_vals[idx_range],y_pred[idx_range]*N)
-    plt.savefig(f'figs/{count_label}_fit.png')
+    plt.savefig(f'figs/{out_str}_cnt.png')
+    fig.clear()
+
+    y_max = np.max(y_ewe)
+    ax = sns.scatterplot(x=x, y=y_ewe / y_max)
+    plt.plot(x_vals[idx_range],y_pred[idx_range]*N / y_max)
+    plt.savefig(f'figs/{out_str}_pct.png')
     fig.clear()
 
     out_vals = pd.Series(pct_vals, name=out_str)
@@ -91,29 +97,34 @@ def data_prctiles(csv_file):
     # comb_dwnpr_count = pd.Series(df['EW3_dwnpr_date_count'], name='dwnpr_count')
     df.loc[df['DAG_precip'] == '67','EW3_dwnpr_date_count_k'] = float('Nan')
     comb_precip = pd.Series(np.hstack([df['MAB_precip'],df['DAG_precip']]), name='precip')
-    comb_flood_count = pd.Series(np.hstack([df['EW3_flood_date_count_m'],df['EW3_flood_date_count_k']]), name='flood_count')
-    comb_dwnpr_count = pd.Series(np.hstack([df['EW3_dwnpr_date_count_m'],df['EW3_dwnpr_date_count_k']]), name='dwnpr_count')
-
     comb_max_temp = pd.Series(np.hstack([df['MAB_max_temp'], df['DAG_max_temp']]), name='max_temp')
     comb_min_temp = pd.Series(np.hstack([df['MAB_max_temp'], df['DAG_max_temp']]), name='min_temp')
+
+    comb_flood_count = pd.Series(np.hstack([df['EW3_flood_date_count_m'],df['EW3_flood_date_count_k']]), name='flood_count')
+    comb_dwnpr_count = pd.Series(np.hstack([df['EW3_dwnpr_date_count_m'],df['EW3_dwnpr_date_count_k']]), name='dwnpr_count')
 
     combined_df = pd.concat([comb_precip, comb_flood_count, comb_dwnpr_count], axis=1)
     out_df = load_model(out_df, combined_df, 'precip', 'flood_count', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip')
     out_df = load_model(out_df, combined_df, 'precip', 'dwnpr_count', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip')
 
+    # out_df = load_model(out_df, combined_df, 'max_temp', 'flood_count', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip')
+    # out_df = load_model(out_df, combined_df, 'max_temp', 'dwnpr_count', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip')
 
-    # # # Flood/downpour Mathare
-    # out_df = load_model(out_df, df, 'MAB_precip', 'EW3_flood_date_count_m', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip_m')
-    # out_df = load_model(out_df, df, 'MAB_precip', 'EW3_dwnpr_date_count_m', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip_m')
+    # Flood/downpour Mathare
+    out_df = load_model(out_df, df, 'MAB_precip', 'EW3_flood_date_count_m', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip_m')
+    out_df = load_model(out_df, df, 'MAB_precip', 'EW3_dwnpr_date_count_m', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip_m')
     
-    # # # Flood/downpour Kibera
-    # out_df = load_model(out_df, df, 'DAG_precip', 'EW3_flood_date_count_k', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip_k')
-    # out_df = load_model(out_df, df, 'DAG_precip', 'EW3_dwnpr_date_count_k', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip_k')
+    # Flood/downpour Kibera
+    out_df = load_model(out_df, df, 'DAG_precip', 'EW3_flood_date_count_k', N, prctiles, 1, 'mm/day', '# flood reports', 'flood_precip_k')
+    out_df = load_model(out_df, df, 'DAG_precip', 'EW3_dwnpr_date_count_k', N, prctiles, 1, 'mm/day', '# downpour reports', 'dwnpr_precip_k')
 
-    # # Heat/Drought/Cold Mathare
-    # out_df = load_model(out_df, df, 'MAB_max_temp', 'EW3_heat_date_count_m', N, prctiles, 4, 'C', '# extreme heat reports', 'heat_temp_m')
-    # out_df = load_model(out_df, df, 'MAB_max_temp', 'EW3_drght_date_count_m', N, prctiles, 4, 'C', '# drought reports', 'drght_temp_m')
-    # out_df = load_model(out_df, df, 'MAB_min_temp', 'EW3_cold_date_count_m', N, prctiles, 4, 'C', '# exterme cold reports', 'cold_temp_m')
+    # Heat/Cold Mathare
+    out_df = load_model(out_df, df, 'MAB_max_temp', 'EW3_heat_date_count_m', N, prctiles, 1, 'C', '# extreme heat reports', 'heat_temp_m')
+    out_df = load_model(out_df, df, 'MAB_min_temp', 'EW3_cold_date_count_m', N, prctiles, 1, 'C', '# exterme cold reports', 'cold_temp_m')
+
+    # Heat/Cold Kibera
+    out_df = load_model(out_df, df, 'DAG_max_temp', 'EW3_heat_date_count_k', N, prctiles, 1, 'C', '# extreme heat reports', 'heat_temp_k')
+    out_df = load_model(out_df, df, 'DAG_min_temp', 'EW3_cold_date_count_k', N, prctiles, 1, 'C', '# exterme cold reports', 'cold_temp_k')
 
     # valid_idx = np.array(np.where(df.loc[:,'EW3_heat_date_count_m'].notnull())).flatten()
 
